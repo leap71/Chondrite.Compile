@@ -32,3 +32,8 @@ during `Clean`, and incompatible-declaration diagnostics. Roslyn's assemblies mu
 be bundled with the compiler and must not appear in the application's output.
 Additional checks cover a schema-only library with no initial C# sources and an
 explicitly excluded file occupying the exact scaffold destination.
+
+Compile-input checks compare filesystem identity so Windows path casing and
+short-name aliases do not cause false failures. Regression checks accept another
+name for the same file and reject unrelated files with matching names or contents.
+Failures report the expected source and the complete recorded compile-input list.

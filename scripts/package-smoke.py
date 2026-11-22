@@ -24,6 +24,28 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def require_compile_input(inputs: Path, source: Path, project: Path, message: str) -> None:
+    """Require the actual source file, allowing filesystem aliases and native casing."""
+    details = []
+    for entry in inputs.read_text(encoding="utf-8-sig").splitlines():
+        if not entry:
+            continue
+        candidate = Path(entry)
+        if not candidate.is_absolute():
+            candidate = project / candidate
+        try:
+            if source.samefile(candidate):
+                return
+            details.append(f"  {entry}")
+        except OSError as error:
+            details.append(f"  {entry} [could not compare: {error}]")
+    raise AssertionError(
+        f"{message}\nExpected source: {source}\nResolved source: {source.resolve()}\n"
+        f"Compile-input manifest: {inputs}\nCompile inputs:\n" +
+        ("\n".join(details) if details else "  <empty>")
+    )
+
+
 def local_name(element: ET.Element) -> str:
     return element.tag.rsplit("}", 1)[-1]
 
@@ -114,6 +136,32 @@ def schema(name: str, extra: str = "") -> str:
     )
 
 
+def exercise_compile_input_paths(work: Path) -> None:
+    print("[package smoke] Compile-input file identity and diagnostics", flush=True)
+    project = work / "path identity checks"
+    source = project / "Records" / "Sample.cs"
+    alias = project / "Another Name.cs"
+    inputs = project / "compile-items.txt"
+    write_text(source, "// The same source can have several filesystem names.\n")
+    os.link(source, alias)
+    # A hard link exercises aliases on every platform without symlink privileges.
+    write_text(inputs, "\ufeffMissing.cs\nAnother Name.cs\n")
+    require_compile_input(inputs, source, project, "A source alias was not recognized.")
+
+    # A path substring or identical contents do not establish file identity.
+    for other in (source.with_suffix(".cs.backup"), project / "Elsewhere" / source.name):
+        write_text(other, source.read_text(encoding="utf-8"))
+        write_text(inputs, str(other) + "\n")
+        try:
+            require_compile_input(inputs, source, project, "Expected rejection.")
+        except AssertionError as error:
+            diagnostic = str(error)
+            require(all(str(path) in diagnostic for path in (source, inputs, other)),
+                    f"A failed comparison did not identify its paths:\n{diagnostic}")
+        else:
+            raise AssertionError(f"A different file was accepted as a compile input: {other}")
+
+
 def exercise_schema_only(fixture: Path, version: str, dotnet: str,
                          work: Path, environment: dict[str, str]) -> None:
     print("[package smoke] Schema-only library starts without authored C#", flush=True)
@@ -153,9 +201,8 @@ def exercise_schema_only(fixture: Path, version: str, dotnet: str,
     inputs = project / "obj" / "Debug" / "net10.0" / "smoke.compile-items.txt"
     require(editable.is_file() and (project / "bin" / "Debug" / "net10.0" / "SchemaOnly.dll").is_file(),
             "The schema-only project did not produce its editable partial and assembly.")
-    require(str(editable).replace("\\", "/") in
-            inputs.read_text(encoding="utf-8-sig").replace("\\", "/"),
-            "The first editable source was not included when Compile began empty.")
+    require_compile_input(inputs, editable, project,
+                          "The first editable source was not included when Compile began empty.")
 
 
 def exercise_editable(fixture: Path, version: str, dotnet: str,
@@ -201,9 +248,8 @@ def exercise_editable(fixture: Path, version: str, dotnet: str,
             not any(output.glob("Microsoft.CodeAnalysis*.dll")),
             "Compiler or Roslyn dependencies leaked into application output.")
     inputs = project / "obj" / "Debug" / "net10.0" / "smoke.compile-items.txt"
-    require(str(editable).replace("\\", "/") in
-            inputs.read_text(encoding="utf-8-sig").replace("\\", "/"),
-            "The newly created editable partial was not included in the first C# compilation.")
+    require_compile_input(inputs, editable, project,
+                          "The newly created editable partial was not included in the first C# compilation.")
 
     print("[package smoke] Edited partials move and split without duplicate scaffolds", flush=True)
     generated_before_move = generated_snapshot(generated)
@@ -275,9 +321,8 @@ def exercise_editable(fixture: Path, version: str, dotnet: str,
     require(custom_editable.is_file() and
             not (project / "Records" / "Smoke.CustomFolder.cs").exists(),
             "A configured editable destination was ignored.")
-    require(str(custom_editable).replace("\\", "/") in
-            inputs.read_text(encoding="utf-8-sig").replace("\\", "/"),
-            "The configured destination's new source file was not compiled in the same build.")
+    require_compile_input(inputs, custom_editable, project,
+                          "The configured destination's new source file was not compiled in the same build.")
     probe()
 
     print("[package smoke] Clean preserves editable source", flush=True)
@@ -326,6 +371,7 @@ def exercise_editable(fixture: Path, version: str, dotnet: str,
 
 
 def exercise(package: Path, version: str, dotnet: str, work: Path) -> None:
+    exercise_compile_input_paths(work)
     environment = os.environ.copy()
     environment["PATH"] = str(Path(dotnet).parent) + os.pathsep + environment.get("PATH", "")
     environment["DOTNET_ROOT"] = str(Path(dotnet).parent)
