@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Chondrite.Compile" Version="__PACKAGE_VERSION__" PrivateAssets="all" />
+    <PackageReference Include="Chondrite.Core" Version="0.9.0-alpha02" />
+  </ItemGroup>
+  <Target Name="PackageSmokeCompileInputs" AfterTargets="CoreCompile">
+    <WriteLinesToFile File="$(IntermediateOutputPath)smoke.compile-items.txt"
+                      Lines="@(Compile->'%(FullPath)')"
+                      Overwrite="true" />
+  </Target>
+</Project>

@@ -1,0 +1,5 @@
+chondrite-schema 1
+schema Chondrite.Store.ReplicationCursorV1
+{
+    0: abyCursor bytes
+}

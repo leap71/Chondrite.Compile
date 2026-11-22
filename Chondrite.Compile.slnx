@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Chondrite.Compile/Chondrite.Compile.csproj" />
+  <Project Path="Tests/Chondrite.Compile.Tests.csproj" />
+</Solution>

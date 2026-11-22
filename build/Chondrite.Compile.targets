@@ -1,0 +1,89 @@
+<Project>
+  <PropertyGroup>
+    <ChondriteCompileEnabled Condition="'$(ChondriteCompileEnabled)' == ''">true</ChondriteCompileEnabled>
+    <ChondriteEnableDefaultSchemaItems Condition="'$(ChondriteEnableDefaultSchemaItems)' == ''">true</ChondriteEnableDefaultSchemaItems>
+    <ChondriteDotNetHost Condition="'$(ChondriteDotNetHost)' == '' and '$(DotNetHostPath)' != ''">$(DotNetHostPath)</ChondriteDotNetHost>
+    <ChondriteDotNetHost Condition="'$(ChondriteDotNetHost)' == '' and '$(DOTNET_HOST_PATH)' != ''">$(DOTNET_HOST_PATH)</ChondriteDotNetHost>
+    <ChondriteDotNetHost Condition="'$(ChondriteDotNetHost)' == ''">dotnet</ChondriteDotNetHost>
+    <_ChondriteTargetsFile>$(MSBuildThisFileFullPath)</_ChondriteTargetsFile>
+    <_ChondriteCompilerDirectory>$(MSBuildThisFileDirectory)../tools/net10.0/</_ChondriteCompilerDirectory>
+    <_ChondriteCompilerPath>$(_ChondriteCompilerDirectory)Chondrite.Compile.dll</_ChondriteCompilerPath>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(ChondriteEnableDefaultSchemaItems)' == 'true' and '@(ChondriteSchema)' == ''">
+    <ChondriteSchema Include="$(MSBuildProjectDirectory)/Schemas/**/*.chondrite" />
+  </ItemGroup>
+
+  <!-- Resolve IntermediateOutputPath at execution time, after the SDK has added
+       configuration and target-framework directories. -->
+  <Target Name="_ChondriteInitialize">
+    <PropertyGroup>
+      <ChondriteCompileOutputDir Condition="'$(ChondriteCompileOutputDir)' == ''">$(IntermediateOutputPath)ChondriteSchemas/</ChondriteCompileOutputDir>
+      <ChondriteCompileOutputDir>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(ChondriteCompileOutputDir)'))</ChondriteCompileOutputDir>
+      <_ChondriteInputManifest>$(ChondriteCompileOutputDir)sources.txt</_ChondriteInputManifest>
+      <_ChondriteSettingsManifest>$(ChondriteCompileOutputDir)settings.txt</_ChondriteSettingsManifest>
+      <_ChondriteOutputManifest>$(ChondriteCompileOutputDir).chondrite.outputs</_ChondriteOutputManifest>
+      <_ChondriteStamp>$(ChondriteCompileOutputDir)chondrite.stamp</_ChondriteStamp>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="_ChondritePrepare" DependsOnTargets="_ChondriteInitialize">
+    <Error Condition="!Exists('$(_ChondriteCompilerPath)')"
+           Text="Chondrite.Compile's bundled executable is missing. Restore the Chondrite.Compile package." />
+    <MakeDir Directories="$(ChondriteCompileOutputDir)" />
+    <!-- These manifests also detect removal of the final schema, and compiler
+         package changes whose file timestamps predate the previous build. -->
+    <WriteLinesToFile File="$(_ChondriteInputManifest)"
+                      Lines="@(ChondriteSchema->'%(FullPath)')"
+                      Encoding="UTF-8" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_ChondriteSettingsManifest)"
+                      Lines="Compiler=$(_ChondriteCompilerPath);Host=$(ChondriteDotNetHost);@(ChondriteCompileAdditionalInputs->'%(FullPath)')"
+                      Encoding="UTF-8" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ReadLinesFromFile File="$(_ChondriteOutputManifest)" Condition="Exists('$(_ChondriteOutputManifest)')">
+      <Output TaskParameter="Lines" ItemName="_ChondritePreviousOutputName" />
+    </ReadLinesFromFile>
+    <Error Condition="'@(_ChondritePreviousOutputName)' != '' and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(_ChondritePreviousOutputName.Identity)', '^(?:[A-Za-z_][A-Za-z0-9_.]*\.(?:g\.cs|canonical\.chondrite)|catalog\.txt)$'))"
+           Text="Invalid entry in the Chondrite generated-output manifest: %(_ChondritePreviousOutputName.Identity)" />
+    <ItemGroup>
+      <_ChondritePreviousOutput Include="@(_ChondritePreviousOutputName->'$(ChondriteCompileOutputDir)%(Identity)')" />
+      <_ChondriteMissingOutput Include="@(_ChondritePreviousOutput)" Condition="!Exists('%(Identity)')" />
+      <_ChondriteCompilerFiles Include="$(_ChondriteCompilerDirectory)**/*" />
+    </ItemGroup>
+    <Delete Files="$(_ChondriteStamp)"
+            Condition="'@(_ChondritePreviousOutputName)' == '' or '@(_ChondriteMissingOutput)' != ''" />
+  </Target>
+
+  <Target Name="_ChondriteGenerate"
+          DependsOnTargets="_ChondritePrepare"
+          Condition="'$(DesignTimeBuild)' != 'true'"
+          Inputs="@(ChondriteSchema);$(_ChondriteInputManifest);$(_ChondriteSettingsManifest);$(_ChondriteTargetsFile);@(_ChondriteCompilerFiles);@(ChondriteCompileAdditionalInputs)"
+          Outputs="$(_ChondriteStamp)">
+    <!-- The dot after the directory separator avoids a quoted trailing backslash
+         on Windows. A line-based input file also avoids shell and length issues. -->
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)"
+          Command="&quot;$(ChondriteDotNetHost)&quot; &quot;$(_ChondriteCompilerPath)&quot; --out &quot;$(ChondriteCompileOutputDir).&quot; --inputs &quot;$(_ChondriteInputManifest)&quot;" />
+    <Touch Files="$(_ChondriteStamp)" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="_ChondriteInclude" DependsOnTargets="_ChondriteInitialize">
+    <ReadLinesFromFile File="$(_ChondriteOutputManifest)" Condition="Exists('$(_ChondriteOutputManifest)')">
+      <Output TaskParameter="Lines" ItemName="_ChondriteOutputName" />
+    </ReadLinesFromFile>
+    <ItemGroup>
+      <_ChondriteOutput Include="@(_ChondriteOutputName->'$(ChondriteCompileOutputDir)%(Identity)')" />
+      <Compile Remove="$(ChondriteCompileOutputDir)**/*.g.cs" />
+      <Compile Include="@(_ChondriteOutput)" Condition="'%(Extension)' == '.cs'" />
+      <!-- A removed definition must invalidate C# compilation even when every
+           remaining generated file is unchanged. -->
+      <CustomAdditionalCompileInputs Include="$(_ChondriteOutputManifest)" />
+      <FileWrites Include="@(_ChondriteOutput);$(_ChondriteInputManifest);$(_ChondriteSettingsManifest);$(_ChondriteOutputManifest);$(_ChondriteStamp)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Public entry point: automatic before C# compilation, or explicitly invoked
+       with dotnet msbuild -restore -target:ChondriteCompile. -->
+  <Target Name="ChondriteCompile"
+          BeforeTargets="BeforeCompile;CoreCompile"
+          DependsOnTargets="_ChondriteGenerate;_ChondriteInclude"
+          Condition="'$(ChondriteCompileEnabled)' == 'true' and '$(IsCrossTargetingBuild)' != 'true'" />
+</Project>

@@ -1,0 +1,8 @@
+chondrite-schema 1
+schema Chondrite.Examples.Sample
+{
+    0: idNonce nonce
+    1: vecPosition vector3f
+    2: uPressure Chondrite.Examples.Pascals
+    3: astrTags utf8[]
+}

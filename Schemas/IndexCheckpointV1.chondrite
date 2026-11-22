@@ -1,0 +1,7 @@
+chondrite-schema 1
+schema Chondrite.Store.Indexing.IndexCheckpointV1
+{
+    0: nIndexVersion int32
+    1: idRecordType objectid
+    2: abyCursor bytes
+}

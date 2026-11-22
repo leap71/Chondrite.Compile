@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>Chondrite.Compile</AssemblyName>
+    <RootNamespace>Chondrite.Compile</RootNamespace>
+    <PackageId>Chondrite.Compile</PackageId>
+    <Version>0.1.0-alpha01</Version>
+    <Authors>LEAP 71</Authors>
+    <Company>LEAP 71</Company>
+    <Description>Deterministic Chondrite schema compiler with automatic MSBuild integration and a bundled command-line executable.</Description>
+    <PackageTags>Chondrite;schema;compiler;code-generation;storage</PackageTags>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+    <UseAppHost>false</UseAppHost>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IsPackable>true</IsPackable>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);ChondritePackCompiler</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Chondrite.Core" Version="0.9.0-alpha02" />
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="../../build/Chondrite.Compile.targets" Pack="true" PackagePath="build/" />
+  </ItemGroup>
+
+  <!-- Publish gathers the executable, runtime configuration and every dependency.
+       It also respects NoBuild when packing an already-built configuration. -->
+  <Target Name="ChondritePackCompiler" DependsOnTargets="Publish">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(PublishDir)**/*">
+        <PackagePath>tools/$(TargetFramework)/%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
+</Project>
