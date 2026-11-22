@@ -68,7 +68,7 @@ public static class SchemaOutputWriter
             throw new InvalidDataException($"Invalid generated output name '{strName}' in {c_strManifestName}.");
     }
 
-    private static void WriteIfDifferent(string strPath, string strContent)
+    internal static void WriteIfDifferent(string strPath, string strContent)
     {
         byte[] abyContent = SchemaConstants.c_oStrictUtf8.GetBytes(strContent);
         if (File.Exists(strPath) && File.ReadAllBytes(strPath).AsSpan().SequenceEqual(abyContent))
@@ -86,7 +86,7 @@ public static class SchemaOutputWriter
         }
     }
 
-    private static void WriteEditableIfAbsent(string strPath, string strContent)
+    internal static void WriteEditableIfAbsent(string strPath, string strContent)
     {
         if (File.Exists(strPath))
             return;

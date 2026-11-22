@@ -34,6 +34,7 @@ public static class CSharpGenerator
         o.AppendLine();
 
         o.AppendLine("/// <summary>Persistent state generated from an immutable schema.</summary>");
+        o.AppendLine("[global::System.Runtime.InteropServices.StructLayout(global::System.Runtime.InteropServices.LayoutKind.Auto)]");
         o.AppendLine("public readonly partial record struct " + strType + " : IStorageRecord<" + strType + ">");
         o.AppendLine("{");
         o.AppendLine("    private readonly SchemaData m_oData;");

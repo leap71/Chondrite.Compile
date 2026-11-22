@@ -2,6 +2,13 @@
   <PropertyGroup>
     <ChondriteCompileEnabled Condition="'$(ChondriteCompileEnabled)' == ''">true</ChondriteCompileEnabled>
     <ChondriteEnableDefaultSchemaItems Condition="'$(ChondriteEnableDefaultSchemaItems)' == ''">true</ChondriteEnableDefaultSchemaItems>
+    <ChondriteGenerateEditable Condition="'$(ChondriteGenerateEditable)' == ''">true</ChondriteGenerateEditable>
+    <ChondriteEditableOutputDir Condition="'$(ChondriteEditableOutputDir)' == ''">Records/</ChondriteEditableOutputDir>
+    <_ChondriteEvaluationEditableDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(ChondriteEditableOutputDir)'))</_ChondriteEvaluationEditableDirectory>
+    <_ChondriteEvaluationIntermediateDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', 'obj/'))</_ChondriteEvaluationIntermediateDirectory>
+    <_ChondriteEvaluationIntermediateDirectory Condition="'$(BaseIntermediateOutputPath)' != ''">$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)'))</_ChondriteEvaluationIntermediateDirectory>
+    <_ChondriteEvaluationOutputDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', 'bin/'))</_ChondriteEvaluationOutputDirectory>
+    <_ChondriteEvaluationOutputDirectory Condition="'$(BaseOutputPath)' != ''">$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(BaseOutputPath)'))</_ChondriteEvaluationOutputDirectory>
     <ChondriteDotNetHost Condition="'$(ChondriteDotNetHost)' == '' and '$(DotNetHostPath)' != ''">$(DotNetHostPath)</ChondriteDotNetHost>
     <ChondriteDotNetHost Condition="'$(ChondriteDotNetHost)' == '' and '$(DOTNET_HOST_PATH)' != ''">$(DOTNET_HOST_PATH)</ChondriteDotNetHost>
     <ChondriteDotNetHost Condition="'$(ChondriteDotNetHost)' == ''">dotnet</ChondriteDotNetHost>
@@ -9,6 +16,16 @@
     <_ChondriteCompilerDirectory>$(MSBuildThisFileDirectory)../tools/net10.0/</_ChondriteCompilerDirectory>
     <_ChondriteCompilerPath>$(_ChondriteCompilerDirectory)Chondrite.Compile.dll</_ChondriteCompilerPath>
   </PropertyGroup>
+
+  <!-- Capture physical source existence during project evaluation, independently
+       of Compile exclusions. A pre-existing excluded destination must not be
+       mistaken for a new file created by another target-framework build. -->
+  <ItemGroup>
+    <_ChondritePreexistingSource Include="$(MSBuildProjectDirectory)/**/*.cs"
+                                Exclude="$(_ChondriteEvaluationIntermediateDirectory)**/*.cs;$(_ChondriteEvaluationOutputDirectory)**/*.cs" />
+    <!-- Also cover an editable directory outside the project tree. -->
+    <_ChondritePreexistingSource Include="$(_ChondriteEvaluationEditableDirectory)**/*.cs" />
+  </ItemGroup>
 
   <ItemGroup Condition="'$(ChondriteEnableDefaultSchemaItems)' == 'true' and '@(ChondriteSchema)' == ''">
     <ChondriteSchema Include="$(MSBuildProjectDirectory)/Schemas/**/*.chondrite" />
@@ -20,10 +37,27 @@
     <PropertyGroup>
       <ChondriteCompileOutputDir Condition="'$(ChondriteCompileOutputDir)' == ''">$(IntermediateOutputPath)ChondriteSchemas/</ChondriteCompileOutputDir>
       <ChondriteCompileOutputDir>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(ChondriteCompileOutputDir)'))</ChondriteCompileOutputDir>
+      <ChondriteEditableOutputDir Condition="'$(ChondriteEditableOutputDir)' == ''">Records/</ChondriteEditableOutputDir>
+      <ChondriteEditableOutputDir>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(ChondriteEditableOutputDir)'))</ChondriteEditableOutputDir>
+      <_ChondriteBaseIntermediatePath Condition="'$(BaseIntermediateOutputPath)' == ''">obj/</_ChondriteBaseIntermediatePath>
+      <_ChondriteBaseIntermediatePath Condition="'$(BaseIntermediateOutputPath)' != ''">$(BaseIntermediateOutputPath)</_ChondriteBaseIntermediatePath>
+      <_ChondriteBaseIntermediateDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(_ChondriteBaseIntermediatePath)'))</_ChondriteBaseIntermediateDirectory>
+      <_ChondriteIntermediateDirectory>$(_ChondriteBaseIntermediateDirectory)</_ChondriteIntermediateDirectory>
+      <_ChondriteIntermediateDirectory Condition="'$(IntermediateOutputPath)' != ''">$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)'))</_ChondriteIntermediateDirectory>
+      <_ChondriteBaseOutputPath Condition="'$(BaseOutputPath)' == ''">bin/</_ChondriteBaseOutputPath>
+      <_ChondriteBaseOutputPath Condition="'$(BaseOutputPath)' != ''">$(BaseOutputPath)</_ChondriteBaseOutputPath>
+      <_ChondriteBaseOutputDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(_ChondriteBaseOutputPath)'))</_ChondriteBaseOutputDirectory>
+      <_ChondriteOutputDirectory>$(_ChondriteBaseOutputDirectory)</_ChondriteOutputDirectory>
+      <_ChondriteOutputDirectory Condition="'$(OutputPath)' != ''">$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(OutputPath)'))</_ChondriteOutputDirectory>
       <_ChondriteInputManifest>$(ChondriteCompileOutputDir)sources.txt</_ChondriteInputManifest>
       <_ChondriteSettingsManifest>$(ChondriteCompileOutputDir)settings.txt</_ChondriteSettingsManifest>
       <_ChondriteOutputManifest>$(ChondriteCompileOutputDir).chondrite.outputs</_ChondriteOutputManifest>
       <_ChondriteStamp>$(ChondriteCompileOutputDir)chondrite.stamp</_ChondriteStamp>
+      <_ChondriteCSharpManifest>$(ChondriteCompileOutputDir)csharp-sources.txt</_ChondriteCSharpManifest>
+      <_ChondriteProvidedManifest>$(ChondriteCompileOutputDir)provided-types.txt</_ChondriteProvidedManifest>
+      <_ChondriteDefinesManifest>$(ChondriteCompileOutputDir)defines.txt</_ChondriteDefinesManifest>
+      <_ChondriteEditableManifest>$(ChondriteCompileOutputDir)editable-files.txt</_ChondriteEditableManifest>
+      <_ChondritePreexistingManifest>$(ChondriteCompileOutputDir)preexisting-sources.txt</_ChondritePreexistingManifest>
     </PropertyGroup>
   </Target>
 
@@ -65,6 +99,49 @@
     <Touch Files="$(_ChondriteStamp)" AlwaysCreate="true" />
   </Target>
 
+  <!-- Editable source discovery is intentionally independent of the schema stamp:
+       moving or editing a C# partial must be noticed without changing its schema.
+       MSBuild supplies the actual source set, including linked files and exclusions. -->
+  <Target Name="_ChondriteScaffold"
+          DependsOnTargets="_ChondritePrepare"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(ChondriteGenerateEditable)' == 'true'">
+    <PropertyGroup>
+      <_ChondriteLanguageVersionArgument />
+      <_ChondriteLanguageVersionArgument Condition="'$(LangVersion)' != ''">--language-version &quot;$(LangVersion)&quot;</_ChondriteLanguageVersionArgument>
+    </PropertyGroup>
+    <ItemGroup>
+      <_ChondriteAuthoredSource Remove="@(_ChondriteAuthoredSource)" />
+      <_ChondriteEditableFile Remove="@(_ChondriteEditableFile)" />
+      <_ChondriteAuthoredSource Include="@(Compile->'%(FullPath)')"
+                               Exclude="$(ChondriteCompileOutputDir)**/*.cs;$(_ChondriteBaseIntermediateDirectory)**/*.cs;$(_ChondriteIntermediateDirectory)**/*.cs;$(_ChondriteBaseOutputDirectory)**/*.cs;$(_ChondriteOutputDirectory)**/*.cs"
+                               Condition="'%(Compile.Extension)' == '.cs' and '%(Compile.AutoGen)' != 'true'" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(_ChondriteCSharpManifest)"
+                      Lines="@(_ChondriteAuthoredSource)"
+                      Encoding="UTF-8" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_ChondriteProvidedManifest)"
+                      Lines="@(ChondriteEditableProvided)"
+                      Encoding="UTF-8" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_ChondriteDefinesManifest)"
+                      Lines="$(DefineConstants)"
+                      Encoding="UTF-8" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <WriteLinesToFile File="$(_ChondritePreexistingManifest)"
+                      Lines="@(_ChondritePreexistingSource->'%(FullPath)')"
+                      Encoding="UTF-8" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)"
+          Command="&quot;$(ChondriteDotNetHost)&quot; &quot;$(_ChondriteCompilerPath)&quot; --editable-only --editable-out &quot;$(ChondriteEditableOutputDir).&quot; --inputs &quot;$(_ChondriteInputManifest)&quot; --csharp-inputs &quot;$(_ChondriteCSharpManifest)&quot; --provided-types &quot;$(_ChondriteProvidedManifest)&quot; --preexisting-files &quot;$(_ChondritePreexistingManifest)&quot; $(_ChondriteLanguageVersionArgument) --defines-file &quot;$(_ChondriteDefinesManifest)&quot; --editable-manifest &quot;$(_ChondriteEditableManifest)&quot;" />
+    <ReadLinesFromFile File="$(_ChondriteEditableManifest)">
+      <Output TaskParameter="Lines" ItemName="_ChondriteEditableFile" />
+    </ReadLinesFromFile>
+    <ItemGroup>
+      <!-- Newly created source did not exist when the SDK evaluated its globs.
+           Existing Compile items retain their metadata and are not duplicated. -->
+      <Compile Include="@(_ChondriteEditableFile)" Exclude="@(Compile->'%(FullPath)')" />
+      <!-- Only these disposable lists participate in Clean. Editable source never does. -->
+      <FileWrites Include="$(_ChondriteCSharpManifest);$(_ChondriteProvidedManifest);$(_ChondriteDefinesManifest);$(_ChondriteEditableManifest);$(_ChondritePreexistingManifest)" />
+    </ItemGroup>
+  </Target>
+
   <Target Name="_ChondriteInclude" DependsOnTargets="_ChondriteInitialize">
     <ReadLinesFromFile File="$(_ChondriteOutputManifest)" Condition="Exists('$(_ChondriteOutputManifest)')">
       <Output TaskParameter="Lines" ItemName="_ChondriteOutputName" />
@@ -84,6 +161,6 @@
        with dotnet msbuild -restore -target:ChondriteCompile. -->
   <Target Name="ChondriteCompile"
           BeforeTargets="BeforeCompile;CoreCompile"
-          DependsOnTargets="_ChondriteGenerate;_ChondriteInclude"
+          DependsOnTargets="_ChondriteGenerate;_ChondriteScaffold;_ChondriteInclude"
           Condition="'$(ChondriteCompileEnabled)' == 'true' and '$(IsCrossTargetingBuild)' != 'true'" />
 </Project>

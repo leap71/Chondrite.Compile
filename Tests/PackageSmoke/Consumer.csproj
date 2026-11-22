@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ChondriteGenerateEditable>false</ChondriteGenerateEditable>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Chondrite.Compile" Version="__PACKAGE_VERSION__" PrivateAssets="all" />
