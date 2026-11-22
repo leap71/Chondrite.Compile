@@ -163,7 +163,7 @@ public sealed class EditableScaffolderTests : IDisposable
 
     private string strWrite(string strRelative, string strContent)
     {
-        string strPath = Path.Combine(m_strDirectory, strRelative);
+        string strPath = Path.GetFullPath(Path.Combine(m_strDirectory, strRelative));
         Directory.CreateDirectory(Path.GetDirectoryName(strPath)!);
         File.WriteAllText(strPath, strContent);
         return strPath;

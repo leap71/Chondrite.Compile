@@ -247,7 +247,7 @@ public sealed class EditableTypeDiscoveryTests
 
         public string strWrite(string strRelativePath, string strSource)
         {
-            string strPath = Path.Combine(strDirectory, strRelativePath);
+            string strPath = Path.GetFullPath(Path.Combine(strDirectory, strRelativePath));
             Directory.CreateDirectory(Path.GetDirectoryName(strPath)!);
             File.WriteAllText(strPath, strSource);
             return strPath;
