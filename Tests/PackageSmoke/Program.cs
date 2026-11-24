@@ -1,6 +1,7 @@
 // Test-only probe: check the types actually compiled into the consuming assembly.
 using System.Reflection;
 using Chondrite.Core;
+using Chondrite.Store.Serialization;
 
 Assembly oAssembly = typeof(Program).Assembly;
 string[] astrExpected = args.Order(StringComparer.Ordinal).ToArray();
@@ -23,8 +24,12 @@ foreach (string strName in astrExpected)
     if (oObject.idType != idSchema)
         throw new InvalidOperationException("Generated object has an unexpected schema identity.");
 
-    object oRoundTrip = oType.GetMethod("oDeserialize")!.Invoke(null, [oObject])!;
-    if (!oValue.Equals(oRoundTrip))
+    object oRoundTrip = oType.GetMethod("oDeserialize", [typeof(StorageObject)])!
+        .Invoke(null, [oObject])!;
+    object oLimitedRoundTrip = oType.GetMethod("oDeserialize",
+        [typeof(StorageObject), typeof(StorageDecodeLimits)])!
+        .Invoke(null, [oObject, StorageDecodeLimits.oDefault])!;
+    if (!oValue.Equals(oRoundTrip) || !oValue.Equals(oLimitedRoundTrip))
         throw new InvalidOperationException("Generated record did not round-trip through the test fixture.");
 }
 

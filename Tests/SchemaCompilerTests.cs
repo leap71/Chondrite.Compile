@@ -25,6 +25,18 @@ public sealed class SchemaCompilerTests
     }
 
     [Fact]
+    public void V1GoldenPascalsSchemaIdentityDoesNotDrift()
+    {
+        const string strSchema =
+            "chondrite-schema 1\nschema Chondrite.Store.Tests.Records.Pascals\n" +
+            "{\n    0: fValue float64\n}\n";
+        CompiledSchema oSchema = Assert.Single(SchemaCompiler.Compile([strSchema]));
+        Assert.Equal(strSchema, oSchema.CanonicalText);
+        Assert.Equal("BEA2362A5F43FA260363BBBA4A50517461D0211774E358C8D1A7B4CB41B86274",
+            oSchema.Id.ToString());
+    }
+
+    [Fact]
     public void WhitespaceAndCommentsDoNotChangeSchemaId()
     {
         CompiledSchema oA = Assert.Single(SchemaCompiler.Compile([c_strChondrite]));
@@ -67,6 +79,39 @@ public sealed class SchemaCompilerTests
     }
 
     [Fact]
+    public void GeneratedReadersGuardAllArraysBeforeCreatingBuilders()
+    {
+        const string strSchema = """
+            chondrite-schema 1
+            schema Example.Collection
+            {
+                0: aFixed int32[4]
+                1: aVariable vector3f[]
+                2: aOptional optional<utf8>[]
+                3: aNested uint8[][]
+            }
+            """;
+        string strCode = CSharpGenerator.Generate(
+            Assert.Single(SchemaCompiler.Compile([strSchema])));
+        Assert.Contains("oReader.GuardCollectionCount(nCount0, 4);", strCode);
+        Assert.Contains("oReader.GuardCollectionCount(nCount1, 12);", strCode);
+        Assert.Contains("oReader.GuardCollectionCount(nCount2, 1);", strCode);
+        // Two nested builders produce five guards in total.
+        Assert.Equal(5, strCode.Split("GuardCollectionCount(").Length - 1);
+        Assert.Equal(5, strCode.Split("ImmutableArray.CreateBuilder<").Length - 1);
+    }
+
+    [Fact]
+    public void CompiledSchemaOwnsOneCanonicalIdentity()
+    {
+        CompiledSchema oSchema = Assert.Single(SchemaCompiler.Compile([c_strChondrite]));
+        Assert.Equal(oSchema.Id, oSchema.SchemaObject.idCalculateIdentity());
+        Assert.Equal(oSchema.CanonicalText,
+            Encoding.UTF8.GetString(oSchema.SchemaObject.abyData.AsSpan()));
+        Assert.Equal(c_strChondrite, oSchema.CanonicalText);
+    }
+
+    [Fact]
     public void GeneratedCodeTargetsChondriteCoreAndStore()
     {
         CompiledSchema oSchema = Assert.Single(SchemaCompiler.Compile([c_strChondrite]));
@@ -80,6 +125,7 @@ public sealed class SchemaCompilerTests
         Assert.Contains("private static readonly ImmutableArray<byte> c_abyCanonicalSchema", strGenerated);
         Assert.Contains("oStore.idRegisterType(c_abyCanonicalSchema)", strGenerated);
         Assert.Contains("public static Pascals oDeserialize(StorageObject oObject)", strGenerated);
+        Assert.Contains("public static Pascals oDeserialize(StorageObject oObject, StorageDecodeLimits oLimits)", strGenerated);
         Assert.Contains("public static Pascals oGet(IObjectStore oStore", strGenerated);
     }
 

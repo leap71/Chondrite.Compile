@@ -97,11 +97,15 @@ public static class CSharpGenerator
         o.AppendLine("    }");
         o.AppendLine();
         o.AppendLine("    public static " + strType + " oDeserialize(StorageObject oObject)");
+        o.AppendLine("        => oDeserialize(oObject, StorageDecodeLimits.oDefault);");
+        o.AppendLine();
+        o.AppendLine("    /// <summary>Decodes using limits scoped to this top-level record.</summary>");
+        o.AppendLine("    public static " + strType + " oDeserialize(StorageObject oObject, StorageDecodeLimits oLimits)");
         o.AppendLine("    {");
         o.AppendLine("        ArgumentNullException.ThrowIfNull(oObject);");
         o.AppendLine("        if (oObject.idType != idSchema)");
         o.AppendLine("            throw new InvalidDataException(\"Unexpected persistence schema.\");");
-        o.AppendLine("        StorageBinaryReader oReader = new(oObject.abyData.AsSpan());");
+        o.AppendLine("        StorageBinaryReader oReader = new(oObject.abyData.AsSpan(), oLimits);");
         o.AppendLine("        " + strType + " oValue = oRead(ref oReader);");
         o.AppendLine("        oReader.EnsureEnd();");
         o.AppendLine("        return oValue;");
@@ -292,6 +296,39 @@ public static class CSharpGenerator
         }
     }
 
+    // Provable minimum wire width, never a heuristic. A referenced schema may
+    // contain no fields, so its conservative bound is zero.
+    private static int MinimumElementBytes(SchemaType oType) => oType switch
+    {
+        PrimitiveType oPrimitive => oPrimitive.Name switch
+        {
+            "bool" or "int8" or "uint8" => 1,
+            "int16" or "uint16" => 2,
+            "int32" or "uint32" or "float32" => 4,
+            "int64" or "uint64" or "float64" => 8,
+            "guid" or "nonce" or "vector4f" => 16,
+            "objectid" => 32,
+            "vector2f" => 8,
+            "vector3f" => 12,
+            "utf8" or "bytes" => 8,
+            _ => 0
+        },
+        OptionalType => 1,
+        ArrayType oArray when oArray.FixedCount is null => 8,
+        ArrayType oArray => MinimumFixedArrayBytes(oArray),
+        _ => 0
+    };
+
+    private static int MinimumFixedArrayBytes(ArrayType oArray)
+    {
+        if (oArray.FixedCount is not ulong nCount)
+            return 8; // A variable array always includes an eight-byte count.
+        int nWidth = MinimumElementBytes(oArray.Element);
+        if (nWidth == 0 || nCount > (ulong)(int.MaxValue / nWidth))
+            return 0;
+        return (int)nCount * nWidth;
+    }
+
     private static void EmitRead(StringBuilder o, SchemaType oType, string strTarget,
         int nIndent, ref int nSerial)
     {
@@ -330,6 +367,10 @@ public static class CSharpGenerator
             }
             else
                 Line(o, nIndent, "int " + strCount + " = oReader.ReadCount();");
+            // The guard must run before allocating the builder. A zero lower bound
+            // is conservative for nested records, whose codecs may be empty.
+            Line(o, nIndent, "oReader.GuardCollectionCount(" + strCount + ", " +
+                MinimumElementBytes(oArr.Element).ToString(CultureInfo.InvariantCulture) + ");");
             Line(o, nIndent, "var " + strBuilder + " = ImmutableArray.CreateBuilder<" + CSharpType(oArr.Element) + ">(" + strCount + ");");
             Line(o, nIndent, "for (int " + strIndex + " = 0; " + strIndex + " < " + strCount + "; " + strIndex + "++)");
             Line(o, nIndent, "{");

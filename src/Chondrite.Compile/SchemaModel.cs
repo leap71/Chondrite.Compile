@@ -14,13 +14,32 @@ public sealed record OptionalType(SchemaType Inner) : SchemaType;
 
 public sealed record SchemaField(int Index, string Name, SchemaType Type);
 public sealed record SchemaSource(string Name, IReadOnlyList<SchemaField> Fields);
-public sealed record CompiledSchema(
-    string Name,
-    IReadOnlyList<SchemaField> Fields,
-    string CanonicalText,
-    StorageObject SchemaObject,
-    StorageObjectId Id,
-    IReadOnlyList<string> Dependencies);
+/// <summary>
+/// One resolved, immutable schema snapshot. Canonical text, object, and identity
+/// are calculated together and cannot be supplied independently by callers.
+/// </summary>
+public sealed class CompiledSchema
+{
+    public string Name { get; }
+    public IReadOnlyList<SchemaField> Fields { get; }
+    public string CanonicalText { get; }
+    public StorageObject SchemaObject { get; }
+    public StorageObjectId Id { get; }
+    public IReadOnlyList<string> Dependencies { get; }
+
+    internal CompiledSchema(string strName, IEnumerable<SchemaField> aFields,
+        IReadOnlyDictionary<string, CompiledSchema> oResolved,
+        IEnumerable<string> astrDependencies)
+    {
+        Name = strName;
+        Fields = ImmutableArray.CreateRange(aFields);
+        Dependencies = ImmutableArray.CreateRange(astrDependencies);
+        CanonicalText = SchemaCompiler.strFormatCanonical(Name, Fields, oResolved);
+        SchemaObject = new(StorageType.idIntrinsicSchema,
+            ImmutableArray.CreateRange(SchemaConstants.c_oStrictUtf8.GetBytes(CanonicalText)));
+        Id = SchemaObject.idCalculateIdentity();
+    }
+}
 
 public static class SchemaConstants
 {

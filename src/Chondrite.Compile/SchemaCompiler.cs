@@ -39,22 +39,8 @@ public static class SchemaCompiler
             foreach (string strDep in oDependencies.OrderBy(x => x, StringComparer.Ordinal))
                 CompileOne(strDep);
 
-            StringBuilder oCanonical = new();
-            oCanonical.Append(SchemaConstants.c_strHeader).Append('\n');
-            oCanonical.Append("schema ").Append(strName).Append("\n{\n");
-            foreach (SchemaField oField in oSource.Fields)
-            {
-                oCanonical.Append("    ").Append(oField.Index.ToString(CultureInfo.InvariantCulture)).Append(": ")
-                    .Append(oField.Name).Append(' ')
-                    .Append(FormatType(oField.Type, oCompiled)).Append('\n');
-            }
-            oCanonical.Append("}\n");
-            string strCanonical = oCanonical.ToString();
-            StorageObject oObject = new(SchemaConstants.c_idSchemaType,
-                ImmutableArray.CreateRange(SchemaConstants.c_oStrictUtf8.GetBytes(strCanonical)));
-            CompiledSchema oResult = new(strName, oSource.Fields, strCanonical,
-                oObject, oObject.idCalculateIdentity(),
-                oDependencies.OrderBy(x => x, StringComparer.Ordinal).ToArray());
+            CompiledSchema oResult = new(strName, oSource.Fields, oCompiled,
+                oDependencies.OrderBy(x => x, StringComparer.Ordinal));
             oCompiled.Add(strName, oResult);
             aOrdered.Add(oResult);
             oActive.Remove(strName);
@@ -64,6 +50,23 @@ public static class SchemaCompiler
         foreach (string strName in oSources.Keys.OrderBy(x => x, StringComparer.Ordinal))
             CompileOne(strName);
         return aOrdered;
+    }
+
+    internal static string strFormatCanonical(string strName,
+        IReadOnlyList<SchemaField> aFields,
+        IReadOnlyDictionary<string, CompiledSchema> oResolved)
+    {
+        StringBuilder oCanonical = new();
+        oCanonical.Append(SchemaConstants.c_strHeader).Append('\n');
+        oCanonical.Append("schema ").Append(strName).Append("\n{\n");
+        foreach (SchemaField oField in aFields)
+        {
+            oCanonical.Append("    ").Append(oField.Index.ToString(CultureInfo.InvariantCulture))
+                .Append(": ").Append(oField.Name).Append(' ')
+                .Append(FormatType(oField.Type, oResolved)).Append('\n');
+        }
+        oCanonical.Append("}\n");
+        return oCanonical.ToString();
     }
 
     private static void GatherReferences(SchemaType oType, HashSet<string> oNames)

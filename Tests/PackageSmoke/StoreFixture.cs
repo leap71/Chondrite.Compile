@@ -25,6 +25,16 @@ namespace Chondrite.Store
 
 namespace Chondrite.Store.Serialization
 {
+    // Test-only stand-in for the runtime decode limits. It intentionally keeps
+    // the same public shape as Chondrite.Store without adding a package dependency.
+    public readonly record struct StorageDecodeLimits(
+        int nMaxCollectionElements,
+        long nMaxMaterializedBytes)
+    {
+        public static StorageDecodeLimits oDefault { get; } =
+            new(1_000_000, int.MaxValue);
+    }
+
     public interface IStorageRecord<TSelf> where TSelf : IStorageRecord<TSelf>
     {
         static abstract StorageType idSchema { get; }
@@ -57,8 +67,26 @@ namespace Chondrite.Store.Serialization
     public ref struct StorageBinaryReader
     {
         private ReadOnlySpan<byte> m_abyRemaining;
+        private int m_nRemainingCollectionElements;
 
-        public StorageBinaryReader(ReadOnlySpan<byte> abyData) => m_abyRemaining = abyData;
+        public StorageBinaryReader(ReadOnlySpan<byte> abyData, StorageDecodeLimits? oLimits = null)
+        {
+            StorageDecodeLimits oEffective = oLimits ?? StorageDecodeLimits.oDefault;
+            if (oEffective.nMaxCollectionElements < 0 || oEffective.nMaxMaterializedBytes < 0)
+                throw new ArgumentOutOfRangeException(nameof(oLimits));
+            m_abyRemaining = abyData;
+            m_nRemainingCollectionElements = oEffective.nMaxCollectionElements;
+        }
+
+        public void GuardCollectionCount(int nCount, int nMinimumElementBytes)
+        {
+            if (nCount < 0 || nMinimumElementBytes < 0)
+                throw new ArgumentOutOfRangeException();
+            if (nCount > m_nRemainingCollectionElements ||
+                (nMinimumElementBytes > 0 && nCount > m_abyRemaining.Length / nMinimumElementBytes))
+                throw new InvalidDataException("Invalid collection size in package smoke fixture.");
+            m_nRemainingCollectionElements -= nCount;
+        }
 
         public double ReadFloat64()
         {
