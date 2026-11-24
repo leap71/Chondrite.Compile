@@ -1,0 +1,22 @@
+chondrite-schema 1
+
+// One fixed element exercises the generated collection guard without a count prefix.
+schema Smoke.BoolProbe { 0: values bool[1] }
+schema Smoke.Int8Probe { 0: values int8[1] }
+schema Smoke.UInt8Probe { 0: values uint8[1] }
+schema Smoke.Int16Probe { 0: values int16[1] }
+schema Smoke.UInt16Probe { 0: values uint16[1] }
+schema Smoke.Int32Probe { 0: values int32[1] }
+schema Smoke.UInt32Probe { 0: values uint32[1] }
+schema Smoke.Int64Probe { 0: values int64[1] }
+schema Smoke.UInt64Probe { 0: values uint64[1] }
+schema Smoke.Float32Probe { 0: values float32[1] }
+schema Smoke.Float64Probe { 0: values float64[1] }
+schema Smoke.Utf8Probe { 0: values utf8[1] }
+schema Smoke.BytesProbe { 0: values bytes[1] }
+schema Smoke.Vector2fProbe { 0: values vector2f[1] }
+schema Smoke.Vector3fProbe { 0: values vector3f[1] }
+schema Smoke.Vector4fProbe { 0: values vector4f[1] }
+schema Smoke.GuidProbe { 0: values guid[1] }
+schema Smoke.NonceProbe { 0: values nonce[1] }
+schema Smoke.ObjectIdProbe { 0: values objectid[1] }

@@ -162,7 +162,7 @@ internal sealed class SchemaTypeParser
                 throw new FormatException("Nested optional<optional<T>> is unsupported.");
             oType = new OptionalType(oInner);
         }
-        else if (SchemaConstants.c_oPrimitiveToCSharp.ContainsKey(strName))
+        else if (PrimitiveCatalog.Contains(strName))
             oType = new PrimitiveType(strName);
         else
             oType = new ReferenceType(strName);

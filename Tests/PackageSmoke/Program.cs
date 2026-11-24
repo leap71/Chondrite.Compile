@@ -30,7 +30,7 @@ foreach (string strName in astrExpected)
         [typeof(StorageObject), typeof(StorageDecodeLimits)])!
         .Invoke(null, [oObject, StorageDecodeLimits.oDefault])!;
     if (!oValue.Equals(oRoundTrip) || !oValue.Equals(oLimitedRoundTrip))
-        throw new InvalidOperationException("Generated record did not round-trip through the test fixture.");
+        throw new InvalidOperationException("Generated record did not round-trip through the published Store codecs.");
 }
 
 Console.WriteLine($"Verified {astrActual.Length} generated type(s) in the consuming assembly.");

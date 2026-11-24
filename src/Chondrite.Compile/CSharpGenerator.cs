@@ -224,7 +224,7 @@ public static class CSharpGenerator
 
     private static string CSharpType(SchemaType oType) => oType switch
     {
-        PrimitiveType oPrimitive => SchemaConstants.c_oPrimitiveToCSharp[oPrimitive.Name],
+        PrimitiveType oPrimitive => PrimitiveCatalog.Get(oPrimitive.Name).CSharpType,
         ReferenceType oRef => Qualified(oRef.Name),
         ArrayType oArr => "ImmutableArray<" + CSharpType(oArr.Element) + ">",
         OptionalType oOpt => CSharpType(oOpt.Inner) + "?",
@@ -239,27 +239,15 @@ public static class CSharpGenerator
     {
         if (oType is PrimitiveType oPrimitive)
         {
-            string strMethod = oPrimitive.Name switch
-            {
-                "bool" => "WriteBool", "int8" => "WriteInt8", "uint8" => "WriteUInt8",
-                "int16" => "WriteInt16", "uint16" => "WriteUInt16",
-                "int32" => "WriteInt32", "uint32" => "WriteUInt32",
-                "int64" => "WriteInt64", "uint64" => "WriteUInt64",
-                "float32" => "WriteFloat32", "float64" => "WriteFloat64",
-                "utf8" => "WriteUtf8", "bytes" => "WriteBytes",
-                "vector2f" => "WriteVector2f", "vector3f" => "WriteVector3f",
-                "vector4f" => "WriteVector4f",
-                "guid" => "WriteGuid", "nonce" => "WriteNonce",
-                "objectid" => "WriteObjectId",
-                _ => throw new NotSupportedException()
-            };
-            if (oPrimitive.Name == "bytes")
+            PrimitiveDescriptor oDescriptor = PrimitiveCatalog.Get(oPrimitive.Name);
+            string strArgument = strValue;
+            if (oDescriptor.WriteByteSpan)
             {
                 Line(o, nIndent, "if (" + strValue + ".IsDefault)");
                 Line(o, nIndent + 4, "throw new InvalidDataException(\"Uninitialized byte array.\");");
+                strArgument += ".AsSpan()";
             }
-            string strArgument = oPrimitive.Name == "bytes" ? strValue + ".AsSpan()" : strValue;
-            Line(o, nIndent, "oWriter." + strMethod + "(" + strArgument + ");");
+            Line(o, nIndent, "oWriter." + oDescriptor.WriterMethod + "(" + strArgument + ");");
         }
         else if (oType is ReferenceType oRef)
             Line(o, nIndent, Qualified(oRef.Name) + ".xWrite(oWriter, " + strValue + ");");
@@ -300,30 +288,18 @@ public static class CSharpGenerator
     // contain no fields, so its conservative bound is zero.
     private static int MinimumElementBytes(SchemaType oType) => oType switch
     {
-        PrimitiveType oPrimitive => oPrimitive.Name switch
-        {
-            "bool" or "int8" or "uint8" => 1,
-            "int16" or "uint16" => 2,
-            "int32" or "uint32" or "float32" => 4,
-            "int64" or "uint64" or "float64" => 8,
-            "guid" or "nonce" or "vector4f" => 16,
-            "objectid" => 32,
-            "vector2f" => 8,
-            "vector3f" => 12,
-            "utf8" or "bytes" => 8,
-            _ => 0
-        },
+        PrimitiveType oPrimitive => PrimitiveCatalog.Get(oPrimitive.Name).MinimumEncodedBytes,
+        ReferenceType => 0,
         OptionalType => 1,
-        ArrayType oArray when oArray.FixedCount is null => 8,
-        ArrayType oArray => MinimumFixedArrayBytes(oArray),
-        _ => 0
+        ArrayType oArray when oArray.FixedCount is ulong nCount => MinimumFixedArrayBytes(oArray.Element, nCount),
+        ArrayType => 8, // Variable arrays always include an eight-byte count.
+        _ => throw new NotSupportedException($"Unsupported schema type '{oType}'.")
     };
 
-    private static int MinimumFixedArrayBytes(ArrayType oArray)
+    private static int MinimumFixedArrayBytes(SchemaType oElement, ulong nCount)
     {
-        if (oArray.FixedCount is not ulong nCount)
-            return 8; // A variable array always includes an eight-byte count.
-        int nWidth = MinimumElementBytes(oArray.Element);
+        int nWidth = MinimumElementBytes(oElement);
+        // Keep a conservative zero bound if the product cannot be passed as an int.
         if (nWidth == 0 || nCount > (ulong)(int.MaxValue / nWidth))
             return 0;
         return (int)nCount * nWidth;
@@ -335,19 +311,7 @@ public static class CSharpGenerator
         string strType = CSharpType(oType);
         if (oType is PrimitiveType oPrimitive)
         {
-            string strMethod = oPrimitive.Name switch
-            {
-                "bool" => "ReadBool", "int8" => "ReadInt8", "uint8" => "ReadUInt8",
-                "int16" => "ReadInt16", "uint16" => "ReadUInt16", "int32" => "ReadInt32",
-                "uint32" => "ReadUInt32", "int64" => "ReadInt64", "uint64" => "ReadUInt64",
-                "float32" => "ReadFloat32", "float64" => "ReadFloat64",
-                "utf8" => "ReadUtf8", "bytes" => "ReadBytes",
-                "vector2f" => "ReadVector2f", "vector3f" => "ReadVector3f",
-                "vector4f" => "ReadVector4f",
-                "guid" => "ReadGuid", "nonce" => "ReadNonce",
-                "objectid" => "ReadObjectId",
-                _ => throw new NotSupportedException()
-            };
+            string strMethod = PrimitiveCatalog.Get(oPrimitive.Name).ReaderMethod;
             Line(o, nIndent, strType + " " + strTarget + " = oReader." + strMethod + "();");
         }
         else if (oType is ReferenceType oRef)

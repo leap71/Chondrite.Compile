@@ -27,6 +27,7 @@
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);ChondritePackCompiler</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Chondrite.Compile.Tests" />
     <PackageReference Include="Chondrite.Core" Version="0.9.0-alpha02" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" PrivateAssets="all" Publish="true" />
     <None Include="../../README.md" Pack="true" PackagePath="/" />

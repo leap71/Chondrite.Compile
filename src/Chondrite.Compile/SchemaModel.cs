@@ -52,19 +52,4 @@ public static class SchemaConstants
     public static readonly StorageType c_idSchemaType = StorageType.idIntrinsicSchema;
 
     public static readonly UTF8Encoding c_oStrictUtf8 = new(false, true);
-
-    public static readonly IReadOnlyDictionary<string, string> c_oPrimitiveToCSharp =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["bool"] = "bool", ["int8"] = "sbyte", ["uint8"] = "byte",
-            ["int16"] = "short", ["uint16"] = "ushort", ["int32"] = "int",
-            ["uint32"] = "uint", ["int64"] = "long", ["uint64"] = "ulong",
-            ["float32"] = "float", ["float64"] = "double", ["utf8"] = "string",
-            ["vector2f"] = "global::System.Numerics.Vector2",
-            ["vector3f"] = "global::System.Numerics.Vector3",
-            ["vector4f"] = "global::System.Numerics.Vector4",
-            ["bytes"] = "System.Collections.Immutable.ImmutableArray<byte>",
-            ["nonce"] = "global::Chondrite.Store.Nonce",
-            ["guid"] = "System.Guid", ["objectid"] = "global::Chondrite.Core.StorageObjectId"
-        };
 }

@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="PackageSmoke/**/*.cs" />
+    <EmbeddedResource Include="PackageSmoke/Primitives.chondrite" LogicalName="PackageSmoke.Primitives.chondrite" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
     <PackageReference Include="xunit.v3" Version="4.0.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />

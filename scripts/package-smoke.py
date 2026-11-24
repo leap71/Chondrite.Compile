@@ -2,8 +2,8 @@
 """Exercise an actual Chondrite.Compile package in a fresh consuming project.
 
 Uses only the Python 3.9+ standard library and the .NET 10 SDK. NuGet.org is needed
-for the fixture's Chondrite.Core dependency. No compiler source checkout or
-separately installed .NET tool is used by the temporary consumer.
+for the consumer's published Chondrite.Store dependency. The temporary consumers
+use neither a compiler source checkout nor a separately installed .NET tool.
 """
 
 from __future__ import annotations
@@ -89,7 +89,8 @@ def inspect_package(package: Path) -> tuple[str, list[str]]:
                 "Compiler assemblies must not become consumer compile/runtime assets.")
         require(not any(name.endswith(".runtimeconfig.dev.json") for name in names),
                 "Development probing paths must not hide missing bundled dependencies.")
-        require(not any("PackageSmoke" in name or name.endswith("StoreFixture.cs") for name in names),
+        require(not any("PackageSmoke" in name or name.endswith(("PrimitiveProgram.cs", "Primitives.chondrite"))
+                        for name in names),
                 "Test fixtures must not ship in the package.")
         for name in names:
             path = PurePosixPath(name)
@@ -162,20 +163,33 @@ def exercise_compile_input_paths(work: Path) -> None:
             raise AssertionError(f"A different file was accepted as a compile input: {other}")
 
 
+def store_reference(fixture: Path) -> str:
+    # Keep the schema-only library on the same exact Store version as the executables.
+    definition = ET.parse(fixture / "Consumer.csproj")
+    reference = definition.find("./ItemGroup/PackageReference[@Include='Chondrite.Store']")
+    require(reference is not None, "The consumer's Store package reference is missing.")
+    return ET.tostring(reference, encoding="unicode").strip()
+
+
+def exercise_primitives(fixture: Path, version: str, dotnet: str,
+                        work: Path, environment: dict[str, str]) -> None:
+    print("[package smoke] V1 primitive payload widths and readback with published Store", flush=True)
+    project = work / "primitive consumer"
+    definition = (fixture / "Consumer.csproj").read_text(encoding="utf-8").replace("__PACKAGE_VERSION__", version)
+    write_text(project / "Consumer.csproj", definition)
+    write_text(project / "Program.cs", (fixture / "PrimitiveProgram.cs").read_text(encoding="utf-8"))
+    write_text(project / "Schemas" / "Primitives.chondrite",
+               (fixture / "Primitives.chondrite").read_text(encoding="utf-8"))
+    run([dotnet, "build", "Consumer.csproj", "--configuration", "Debug",
+         "-property:ChondriteGenerateEditable=true", "--nologo", "-v:minimal",
+         "-maxcpucount:1", "-nr:false"], project, environment)
+    run([dotnet, str(project / "bin" / "Debug" / "net10.0" / "Consumer.dll")], project, environment)
+
+
 def exercise_schema_only(fixture: Path, version: str, dotnet: str,
                          work: Path, environment: dict[str, str]) -> None:
     print("[package smoke] Schema-only library starts without authored C#", flush=True)
-    runtime = work / "schema runtime fixture"
-    write_text(runtime / "RuntimeFixture.csproj", """<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-  </PropertyGroup>
-  <ItemGroup><PackageReference Include="Chondrite.Core" Version="0.9.0-alpha02" /></ItemGroup>
-</Project>
-""")
-    write_text(runtime / "StoreFixture.cs", (fixture / "StoreFixture.cs").read_text(encoding="utf-8"))
+    store = store_reference(fixture)
     project = work / "schema only library"
     write_text(project / "SchemaOnly.csproj", f"""<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -185,7 +199,7 @@ def exercise_schema_only(fixture: Path, version: str, dotnet: str,
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Chondrite.Compile" Version="{version}" PrivateAssets="all" />
-    <ProjectReference Include="../schema runtime fixture/RuntimeFixture.csproj" />
+    {store}
   </ItemGroup>
   <Target Name="PackageSmokeCompileInputs" AfterTargets="CoreCompile">
     <WriteLinesToFile File="$(IntermediateOutputPath)smoke.compile-items.txt"
@@ -218,8 +232,7 @@ def exercise_editable(fixture: Path, version: str, dotnet: str,
                 properties.remove(property_element)
     project_file = project / "Consumer.csproj"
     ET.ElementTree(definition).write(project_file, encoding="utf-8", xml_declaration=True)
-    for source, destination in (("EditableProgram.cs", "Program.cs"), ("StoreFixture.cs", "StoreFixture.cs")):
-        write_text(project / destination, (fixture / source).read_text(encoding="utf-8"))
+    write_text(project / "Program.cs", (fixture / "EditableProgram.cs").read_text(encoding="utf-8"))
     sample_schema = project / "Schemas" / "Sample.chondrite"
     write_text(sample_schema, schema("Smoke.Sample"))
     generated = project / "obj" / "Debug" / "net10.0" / "ChondriteSchemas"
@@ -463,7 +476,7 @@ def exercise(package: Path, version: str, dotnet: str, work: Path) -> None:
     project = work / "consumer with spaces"
     fixture = Path(__file__).resolve().parents[1] / "Tests" / "PackageSmoke"
     project.mkdir()
-    for filename in ("Consumer.csproj", "Program.cs", "StoreFixture.cs"):
+    for filename in ("Consumer.csproj", "Program.cs"):
         write_text(project / filename,
                    (fixture / filename).read_text(encoding="utf-8").replace("__PACKAGE_VERSION__", version))
     first_schema = project / "Schemas" / "Sample Record.chondrite"
@@ -566,6 +579,7 @@ def exercise(package: Path, version: str, dotnet: str, work: Path) -> None:
 
     exercise_editable(fixture, version, dotnet, work, environment)
     exercise_schema_only(fixture, version, dotnet, work, environment)
+    exercise_primitives(fixture, version, dotnet, work, environment)
 
 
 def main() -> int:
